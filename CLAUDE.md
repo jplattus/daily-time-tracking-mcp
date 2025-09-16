@@ -1,6 +1,6 @@
-# MCP Server with GitHub OAuth - Implementation Guide
+# Daily Time Tracking MCP Server - Implementation Guide
 
-This guide provides implementation patterns and standards for building MCP (Model Context Protocol) servers with GitHub OAuth authentication using Node.js, TypeScript, and Cloudflare Workers. For WHAT to build, see the PRP (Product Requirement Prompt) documents.
+This guide provides implementation patterns and standards for building MCP (Model Context Protocol) servers for Daily Time Tracking integration with GitHub OAuth authentication using Node.js, TypeScript, and Cloudflare Workers. For WHAT to build, see the PRP (Product Requirement Prompt) documents.
 
 ## Core Principles
 
@@ -73,7 +73,7 @@ wrangler types         # Generate TypeScript types from Worker configuration
 
 ## Project Architecture
 
-**IMPORTANT: This is a Cloudflare Workers MCP server with GitHub OAuth authentication for secure database access.**
+**IMPORTANT: This is a Cloudflare Workers MCP server with GitHub OAuth authentication for secure Daily Time Tracking API access.**
 
 ### Current Project Structure
 
@@ -83,10 +83,15 @@ wrangler types         # Generate TypeScript types from Worker configuration
 │   ├── index.ts                  # Main MCP server (standard)
 │   ├── index_sentry.ts          # Sentry-enabled MCP server
 │   ├── simple-math.ts           # Basic MCP example (no auth)
-│   ├── github-handler.ts        # GitHub OAuth flow implementation
-│   ├── database.ts              # PostgreSQL connection & utilities
-│   ├── utils.ts                 # OAuth helper functions
-│   └── workers-oauth-utils.ts   # Cookie-based approval system
+│   ├── daily-api/               # Daily Time Tracking API integration
+│   │   ├── client.ts            # API client and utilities
+│   │   └── types.ts             # TypeScript types for Daily API
+│   ├── tools/                   # MCP tools implementation
+│   │   ├── daily-tools.ts       # Daily Time Tracking tools (standard)
+│   │   ├── daily-tools-sentry.ts # Daily Time Tracking tools with Sentry
+│   │   └── register-tools.ts    # Tool registration helper
+│   └── auth/                    # Authentication implementation
+│       └── github-handler.ts    # GitHub OAuth flow
 ├── PRPs/                        # Product Requirement Prompts
 │   ├── README.md
 │   └── templates/
@@ -103,19 +108,21 @@ wrangler types         # Generate TypeScript types from Worker configuration
 
 **Main Implementation Files:**
 
-- `src/index.ts` - Production MCP server with GitHub OAuth + PostgreSQL
+- `src/index.ts` - Production MCP server with GitHub OAuth + Daily Time Tracking
 - `src/index_sentry.ts` - Same as above with Sentry monitoring integration
 - `src/simple-math.ts` - Basic MCP server example (calculator without auth)
 
+**Daily Time Tracking Integration:**
+
+- `src/daily-api/client.ts` - Daily Time Tracking API client with error handling
+- `src/daily-api/types.ts` - TypeScript types for all Daily API endpoints
+- `src/tools/daily-tools.ts` - MCP tools for Daily Time Tracking (standard)
+- `src/tools/daily-tools-sentry.ts` - MCP tools with Sentry instrumentation
+
 **Authentication & Security:**
 
-- `src/github-handler.ts` - Complete GitHub OAuth 2.0 flow
-- `src/workers-oauth-utils.ts` - HMAC-signed cookie approval system
-- `src/utils.ts` - OAuth token exchange and URL construction helpers
-
-**Database Integration:**
-
-- `src/database.ts` - PostgreSQL connection pooling, SQL validation, security
+- `src/auth/github-handler.ts` - Complete GitHub OAuth 2.0 flow
+- GitHub OAuth provides secure access to Daily Time Tracking data
 
 **Configuration Files:**
 
@@ -161,7 +168,7 @@ cp .dev.vars.example .dev.vars
 wrangler secret put GITHUB_CLIENT_ID
 wrangler secret put GITHUB_CLIENT_SECRET
 wrangler secret put COOKIE_ENCRYPTION_KEY
-wrangler secret put DATABASE_URL
+wrangler secret put DAILY_API_KEY
 wrangler secret put SENTRY_DSN
 ```
 
@@ -188,19 +195,22 @@ wrangler secret put SENTRY_DSN
 
 This project implements MCP servers as Cloudflare Workers with three main patterns:
 
-**1. Authenticated Database MCP Server (`src/index.ts`):**
+**1. Authenticated Daily Time Tracking MCP Server (`src/index.ts`):**
 
 ```typescript
 export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
   server = new McpServer({
-    name: "PostgreSQL Database MCP Server",
+    name: "Daily Time Tracking MCP Server",
     version: "1.0.0",
   });
 
   // MCP Tools available based on user permissions
-  // - listTables (all users)
-  // - queryDatabase (all users, read-only)
-  // - executeDatabase (privileged users only)
+  // - getDailyUser (all users)
+  // - getDailyActivities (all users)
+  // - getDailySummary (all users)
+  // - getDailyTimesheet (all users)
+  // - createDailyActivities (privileged users only)
+  // - getDailyQuickSummary (all users)
 }
 ```
 
@@ -261,117 +271,124 @@ wrangler dev --config wrangler-simple.jsonc  # Port 8789
 
 ### MCP Key Concepts for This Project
 
-- **Tools**: Database operations (listTables, queryDatabase, executeDatabase)
+- **Tools**: Daily Time Tracking operations (getUser, getActivities, getSummary, getTimesheet, createActivities)
 - **Authentication**: GitHub OAuth with role-based access control
 - **Transport**: Dual support for HTTP (`/mcp`) and SSE (`/sse`) protocols
 - **State**: Durable Objects maintain authenticated user context
-- **Security**: SQL injection protection, permission validation, error sanitization
+- **Security**: API key management, input validation, error sanitization
 
-## Database Integration & Security
+## Daily Time Tracking Integration & Security
 
-**CRITICAL: This project provides secure PostgreSQL database access through MCP tools with role-based permissions.**
+**CRITICAL: This project provides secure Daily Time Tracking API access through MCP tools with role-based permissions.**
 
-### Database Architecture
+### API Client Architecture
 
-**Connection Management (`src/database.ts`):**
+**Daily Time Tracking Client (`src/daily-api/client.ts`):**
 
 ```typescript
-// Singleton connection pool with Cloudflare Workers limits
-export function getDb(databaseUrl: string): postgres.Sql {
-  if (!dbInstance) {
-    dbInstance = postgres(databaseUrl, {
-      max: 5, // Max 5 connections for Workers
-      idle_timeout: 20,
-      connect_timeout: 10,
-      prepare: true, // Enable prepared statements
-    });
-  }
-  return dbInstance;
-}
+// Daily Time Tracking API Client with error handling
+export class DailyTimeTrackingClient {
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
 
-// Connection wrapper with error handling
-export async function withDatabase<T>(databaseUrl: string, operation: (db: postgres.Sql) => Promise<T>): Promise<T> {
-  const db = getDb(databaseUrl);
-  // Execute operation with timing and error handling
+  constructor(config: DailyApiConfig) {
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl || 'https://api.dailytimetracking.com';
+  }
+
+  private getHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'API-Key': this.apiKey,
+    };
+  }
 }
 ```
 
 ### Security Implementation
 
-**SQL Injection Protection:**
+**API Key Protection:**
 
 ```typescript
-export function validateSqlQuery(sql: string): { isValid: boolean; error?: string } {
-  const dangerousPatterns = [
-    /;\s*drop\s+/i,
-    /;\s*delete\s+.*\s+where\s+1\s*=\s*1/i,
-    /;\s*truncate\s+/i,
-    // ... more patterns
-  ];
-  // Pattern-based validation for safety
-}
+// Secure API key management
+const getDailyClient = () => {
+  if (!(env as any).DAILY_API_KEY) {
+    throw new Error("DAILY_API_KEY environment variable is required");
+  }
+  return new DailyTimeTrackingClient({
+    apiKey: (env as any).DAILY_API_KEY,
+  });
+};
 
-export function isWriteOperation(sql: string): boolean {
-  const writeKeywords = ["insert", "update", "delete", "create", "drop", "alter"];
-  return writeKeywords.some((keyword) => sql.trim().toLowerCase().startsWith(keyword));
+// Input validation with Zod schemas
+export function isValidISODate(dateString: string): boolean {
+  const iso8601Regex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!iso8601Regex.test(dateString)) {
+    return false;
+  }
+  const date = new Date(dateString + 'T00:00:00.000Z');
+  return !isNaN(date.getTime());
 }
 ```
 
-**Access Control (`src/index.ts`):**
+**Access Control (`src/tools/daily-tools.ts`):**
 
 ```typescript
 const ALLOWED_USERNAMES = new Set<string>([
-  'coleam00'  // Only these GitHub usernames can execute write operations
+  'coleam00'  // Only these GitHub usernames can create/modify activities
 ]);
 
 // Tool availability based on user permissions
-if (ALLOWED_USERNAMES.has(this.props.login)) {
-  // Register executeDatabase tool for privileged users
-  this.server.tool("executeDatabase", ...);
+if (ALLOWED_USERNAMES.has(props.login)) {
+  // Register createDailyActivities tool for privileged users
+  server.tool("createDailyActivities", ...);
 }
 ```
 
 ### MCP Tools Implementation
 
-**Available Database Tools:**
+**Available Daily Time Tracking Tools:**
 
-1. **`listTables`** - Schema discovery (all authenticated users)
-2. **`queryDatabase`** - Read-only SQL queries (all authenticated users)
-3. **`executeDatabase`** - Write operations (privileged users only)
+1. **`getDailyUser`** - User account information (all authenticated users)
+2. **`getDailyActivities`** - List of activities (all authenticated users)
+3. **`getDailySummary`** - Time summary by date range (all authenticated users)
+4. **`getDailyTimesheet`** - Detailed daily timesheet (all authenticated users)
+5. **`createDailyActivities`** - Create/modify activities (privileged users only)
+6. **`getDailyQuickSummary`** - Quick summaries for common periods (all authenticated users)
 
 **Tool Implementation Pattern:**
 
 ```typescript
-this.server.tool(
-  "queryDatabase",
-  "Execute a read-only SQL query against the PostgreSQL database.",
-  {
-    sql: z.string().describe("SQL query - SELECT statements only"),
-  },
-  async ({ sql }) => {
+server.tool(
+  "getDailyActivities",
+  "Get a list of activities from Daily Time Tracking.",
+  GetActivitiesSchema,
+  async ({ includeArchivedActivities }) => {
     try {
-      const validation = validateSqlQuery(sql);
-      if (!validation.isValid) {
-        return { content: [{ type: "text", text: `Invalid SQL: ${validation.error}`, isError: true }] };
+      const client = getDailyClient();
+      const response = await client.getActivities({ includeArchivedActivities });
+
+      if (!response.success) {
+        return createErrorResponse(
+          `Failed to retrieve activities: ${response.error}`,
+          { statusCode: response.statusCode }
+        );
       }
 
-      if (isWriteOperation(sql)) {
-        return { content: [{ type: "text", text: "Write operations not allowed", isError: true }] };
-      }
+      const activities = response.data!;
+      const totalActivities = activities.length;
+      const archivedCount = activities.filter(a => a.archived).length;
 
-      return await withDatabase(this.env.DATABASE_URL, async (db) => {
-        const results = await db.unsafe(sql);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `**Results:**\n\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``,
-            },
-          ],
-        };
-      });
+      return createSuccessResponse(
+        `Retrieved ${totalActivities} activities`,
+        {
+          summary: { total: totalActivities, active: totalActivities - archivedCount },
+          activities,
+        }
+      );
     } catch (error) {
-      return { content: [{ type: "text", text: `Error: ${formatDatabaseError(error)}`, isError: true }] };
+      return createErrorResponse(`Error retrieving activities: ${error.message}`);
     }
   },
 );

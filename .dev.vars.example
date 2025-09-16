@@ -2,12 +2,11 @@ GITHUB_CLIENT_ID=<your github client id>
 GITHUB_CLIENT_SECRET=<your github client secret>
 COOKIE_ENCRYPTION_KEY=<your cookie cookie encryption key>
 
-# Database Connection String
-# This should be a PostgreSQL connection string with full read/write permissions
-# Format: postgresql://username:password@hostname:port/database_name
-# Example: postgresql://user:password@localhost:5432/mydb
-# For production, use Hyperdrive: https://developers.cloudflare.com/hyperdrive/
-DATABASE_URL=postgresql://username:password@localhost:5432/database_name
+# Daily Time Tracking API Key
+# Get your API key from Daily Time Tracking app preferences under the "Integrations" tab
+# Enable the web API in Daily preferences first
+# Keep this key secure and don't share it publicly
+DAILY_API_KEY=<your daily time tracking api key>
 
 # Optional: Add Sentry DSN for local development monitoring
 # Get your DSN from https://sentry.io/settings/projects/your-project/keys/

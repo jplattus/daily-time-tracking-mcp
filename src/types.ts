@@ -52,32 +52,75 @@ export interface ParsedApprovalResult {
   headers: Record<string, string>;
 }
 
-// MCP tool schemas using Zod
-export const ListTablesSchema = {};
+// MCP tool schemas using Zod for Daily Time Tracking
+export const GetUserSchema = {};
 
-export const QueryDatabaseSchema = {
-  sql: z
-    .string()
-    .min(1, "SQL query cannot be empty")
-    .describe("SQL query to execute (SELECT queries only)"),
+export const GetActivitiesSchema = {
+  includeArchivedActivities: z
+    .boolean()
+    .optional()
+    .describe("When set to false, archived activities are excluded from the response. Defaults to true."),
 };
 
-export const ExecuteDatabaseSchema = {
-  sql: z
+export const GetSummarySchema = {
+  start: z
     .string()
-    .min(1, "SQL command cannot be empty")
-    .describe("SQL command to execute (INSERT, UPDATE, DELETE, CREATE, etc.)"),
+    .min(1, "Start date is required")
+    .describe("The start date formatted according to ISO 8601 (YYYY-MM-DD)"),
+  end: z
+    .string()
+    .min(1, "End date is required")
+    .describe("The end date formatted according to ISO 8601 (YYYY-MM-DD)"),
+  includeArchivedActivities: z
+    .boolean()
+    .optional()
+    .describe("When set to false, archived activities are excluded from the response. Defaults to true."),
+};
+
+export const GetTimesheetSchema = {
+  start: z
+    .string()
+    .min(1, "Start date is required")
+    .describe("The start date formatted according to ISO 8601 (YYYY-MM-DD)"),
+  end: z
+    .string()
+    .min(1, "End date is required")
+    .describe("The end date formatted according to ISO 8601 (YYYY-MM-DD)"),
+  includeArchivedActivities: z
+    .boolean()
+    .optional()
+    .describe("When set to false, archived activities are excluded from the response. Defaults to true."),
+};
+
+export const CreateActivitiesSchema = {
+  activities: z
+    .array(
+      z.object({
+        name: z.string().min(1, "Activity name is required"),
+        group: z.string().nullable().optional().describe("Group name for the activity. If omitted or null, the activity is ungrouped."),
+      })
+    )
+    .min(1, "At least one activity is required")
+    .describe("Array of activities to create"),
+  archiveExistingActivities: z
+    .boolean()
+    .optional()
+    .describe("If true, all existing activities will be archived, unless they are part of the request. Defaults to false."),
 };
 
 // MCP response types
 export interface McpTextContent {
+  [x: string]: unknown;
   type: "text";
   text: string;
   isError?: boolean;
+  _meta?: { [x: string]: unknown };
 }
 
 export interface McpResponse {
+  [x: string]: unknown;
   content: McpTextContent[];
+  _meta?: { [x: string]: unknown };
 }
 
 // Standard response creators
@@ -108,18 +151,12 @@ export function createErrorResponse(message: string, details?: any): McpResponse
   };
 }
 
-// Database operation result type
-export interface DatabaseOperationResult<T = any> {
+// Daily Time Tracking operation result type
+export interface DailyApiOperationResult<T = any> {
   success: boolean;
   data?: T;
   error?: string;
-  duration?: number;
-}
-
-// SQL validation result
-export interface SqlValidationResult {
-  isValid: boolean;
-  error?: string;
+  statusCode?: number;
 }
 
 // Re-export external types that are used throughout
