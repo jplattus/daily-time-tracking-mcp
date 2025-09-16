@@ -14,7 +14,7 @@ import { DailyTimeTrackingClient, formatDuration, isValidISODate, getTodayISO, g
 
 const ALLOWED_USERNAMES = new Set<string>([
   // Add GitHub usernames of users who should have access to create/modify activities
-  'coleam00'
+  "jplattus",
 ]);
 
 /**
@@ -23,7 +23,7 @@ const ALLOWED_USERNAMES = new Set<string>([
 function extractMcpParameters(args: any): Record<string, any> {
   const attributes: Record<string, any> = {};
   Object.entries(args).forEach(([key, value]) => {
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       attributes[`mcp.param.${key}`] = value;
     }
   });
@@ -40,16 +40,13 @@ function handleError(error: unknown, toolName: string): any {
   const eventId = Sentry.captureException(error, {
     tags: {
       tool: toolName,
-      component: 'daily-time-tracking',
+      component: "daily-time-tracking",
     },
   });
 
   console.error(`${toolName} error:`, error);
 
-  return createErrorResponse(
-    `Error in ${toolName}: ${errorMessage}`,
-    { sentryEventId: eventId }
-  );
+  return createErrorResponse(`Error in ${toolName}: ${errorMessage}`, { sentryEventId: eventId });
 }
 
 export function registerDailyToolsWithSentry(server: McpServer, env: Env, props: Props) {
@@ -64,33 +61,31 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
   };
 
   // Helper function to register tools with Sentry instrumentation
-  function registerToolWithSentry(
-    name: string,
-    description: string,
-    schema: any,
-    handler: (args: any) => Promise<any>
-  ) {
+  function registerToolWithSentry(name: string, description: string, schema: any, handler: (args: any) => Promise<any>) {
     server.tool(name, description, schema, async (args: any) => {
       return await Sentry.startNewTrace(async () => {
-        return await Sentry.startSpan({
-          name: `mcp.tool/${name}`,
-          attributes: extractMcpParameters(args),
-        }, async (span) => {
-          // Set user context
-          Sentry.setUser({
-            username: props.login,
-            email: props.email,
-          });
+        return await Sentry.startSpan(
+          {
+            name: `mcp.tool/${name}`,
+            attributes: extractMcpParameters(args),
+          },
+          async (span) => {
+            // Set user context
+            Sentry.setUser({
+              username: props.login,
+              email: props.email,
+            });
 
-          try {
-            const result = await handler(args);
-            span.setStatus({ code: 1 }); // OK
-            return result;
-          } catch (error) {
-            span.setStatus({ code: 2 }); // ERROR
-            return handleError(error, name);
-          }
-        });
+            try {
+              const result = await handler(args);
+              span.setStatus({ code: 1 }); // OK
+              return result;
+            } catch (error) {
+              span.setStatus({ code: 2 }); // ERROR
+              return handleError(error, name);
+            }
+          },
+        );
       });
     });
   }
@@ -109,15 +104,12 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
       }
 
       const user = response.data!;
-      return createSuccessResponse(
-        `User information retrieved successfully`,
-        {
-          dataRetention: `${user.dataRetention} days`,
-          lastSynced: user.lastSynced || "Never synchronized",
-          syncStatus: user.lastSynced ? "Active" : "No data synced yet",
-        }
-      );
-    }
+      return createSuccessResponse(`User information retrieved successfully`, {
+        dataRetention: `${user.dataRetention} days`,
+        lastSynced: user.lastSynced || "Never synchronized",
+        syncStatus: user.lastSynced ? "Active" : "No data synced yet",
+      });
+    },
   );
 
   // Tool 2: Get Activities
@@ -135,32 +127,32 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
 
       const activities = response.data!;
       const totalActivities = activities.length;
-      const archivedCount = activities.filter(a => a.archived).length;
+      const archivedCount = activities.filter((a) => a.archived).length;
       const activeCount = totalActivities - archivedCount;
 
       // Group activities by group for better display
-      const groupedActivities = activities.reduce((acc, activity) => {
-        const groupName = activity.group || 'Ungrouped';
-        if (!acc[groupName]) {
-          acc[groupName] = [];
-        }
-        acc[groupName].push(activity);
-        return acc;
-      }, {} as Record<string, typeof activities>);
-
-      return createSuccessResponse(
-        `Retrieved ${totalActivities} activities (${activeCount} active, ${archivedCount} archived)`,
-        {
-          summary: {
-            total: totalActivities,
-            active: activeCount,
-            archived: archivedCount,
-            groups: Object.keys(groupedActivities).length,
-          },
-          activitiesByGroup: groupedActivities,
-        }
+      const groupedActivities = activities.reduce(
+        (acc, activity) => {
+          const groupName = activity.group || "Ungrouped";
+          if (!acc[groupName]) {
+            acc[groupName] = [];
+          }
+          acc[groupName].push(activity);
+          return acc;
+        },
+        {} as Record<string, typeof activities>,
       );
-    }
+
+      return createSuccessResponse(`Retrieved ${totalActivities} activities (${activeCount} active, ${archivedCount} archived)`, {
+        summary: {
+          total: totalActivities,
+          active: activeCount,
+          archived: archivedCount,
+          groups: Object.keys(groupedActivities).length,
+        },
+        activitiesByGroup: groupedActivities,
+      });
+    },
   );
 
   // Tool 3: Get Summary
@@ -188,24 +180,21 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
       const totalDuration = summary.reduce((sum, item) => sum + item.duration, 0);
       const sortedSummary = summary.sort((a, b) => b.duration - a.duration);
 
-      const formattedSummary = sortedSummary.map(item => ({
+      const formattedSummary = sortedSummary.map((item) => ({
         activity: item.activity,
-        group: item.group || 'Ungrouped',
+        group: item.group || "Ungrouped",
         duration: formatDuration(item.duration),
         durationSeconds: item.duration,
-        percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + '%' : '0%',
+        percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + "%" : "0%",
       }));
 
-      return createSuccessResponse(
-        `Time summary from ${start} to ${end} (${formattedSummary.length} activities)`,
-        {
-          period: { start, end },
-          totalTime: formatDuration(totalDuration),
-          totalSeconds: totalDuration,
-          activities: formattedSummary,
-        }
-      );
-    }
+      return createSuccessResponse(`Time summary from ${start} to ${end} (${formattedSummary.length} activities)`, {
+        period: { start, end },
+        totalTime: formatDuration(totalDuration),
+        totalSeconds: totalDuration,
+        activities: formattedSummary,
+      });
+    },
   );
 
   // Tool 4: Get Timesheet
@@ -231,16 +220,16 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
 
       const timesheet = response.data!;
       let totalDays = timesheet.length;
-      let daysWithActivity = timesheet.filter(day => day.activities.length > 0).length;
+      let daysWithActivity = timesheet.filter((day) => day.activities.length > 0).length;
       let totalTimeAllDays = 0;
 
-      const formattedTimesheet = timesheet.map(day => {
+      const formattedTimesheet = timesheet.map((day) => {
         const dayTotal = day.activities.reduce((sum, activity) => sum + activity.duration, 0);
         totalTimeAllDays += dayTotal;
 
-        const formattedActivities = day.activities.map(activity => ({
+        const formattedActivities = day.activities.map((activity) => ({
           activity: activity.activity,
-          group: activity.group || 'Ungrouped',
+          group: activity.group || "Ungrouped",
           duration: formatDuration(activity.duration),
           durationSeconds: activity.duration,
         }));
@@ -254,22 +243,19 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
         };
       });
 
-      return createSuccessResponse(
-        `Timesheet from ${start} to ${end} (${totalDays} days, ${daysWithActivity} with activity)`,
-        {
-          period: { start, end },
-          summary: {
-            totalDays,
-            daysWithActivity,
-            daysWithoutActivity: totalDays - daysWithActivity,
-            totalTime: formatDuration(totalTimeAllDays),
-            totalSeconds: totalTimeAllDays,
-            averagePerDay: totalDays > 0 ? formatDuration(Math.round(totalTimeAllDays / totalDays)) : '0s',
-          },
-          timesheet: formattedTimesheet,
-        }
-      );
-    }
+      return createSuccessResponse(`Timesheet from ${start} to ${end} (${totalDays} days, ${daysWithActivity} with activity)`, {
+        period: { start, end },
+        summary: {
+          totalDays,
+          daysWithActivity,
+          daysWithoutActivity: totalDays - daysWithActivity,
+          totalTime: formatDuration(totalTimeAllDays),
+          totalSeconds: totalTimeAllDays,
+          averagePerDay: totalDays > 0 ? formatDuration(Math.round(totalTimeAllDays / totalDays)) : "0s",
+        },
+        timesheet: formattedTimesheet,
+      });
+    },
   );
 
   // Tool 5: Create Activities (privileged users only)
@@ -289,16 +275,16 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
         const result = response.data!;
 
         return createSuccessResponse(
-          `Successfully processed ${activities.length} activities${archiveExistingActivities ? ' (existing activities were archived)' : ''}`,
+          `Successfully processed ${activities.length} activities${archiveExistingActivities ? " (existing activities were archived)" : ""}`,
           {
             requestedActivities: activities.length,
             processedActivities: result.length,
             archivedExisting: archiveExistingActivities || false,
             activities: result,
             executedBy: `${props.login} (${props.name})`,
-          }
+          },
         );
-      }
+      },
     );
   }
 
@@ -323,35 +309,35 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
       const today = new Date();
 
       switch (period) {
-        case 'today':
+        case "today":
           start = end = getTodayISO();
           break;
-        case 'yesterday':
+        case "yesterday":
           start = end = getDaysAgoISO(1);
           break;
-        case 'this_week':
+        case "this_week":
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - today.getDay());
-          start = startOfWeek.toISOString().split('T')[0];
+          start = startOfWeek.toISOString().split("T")[0];
           end = getTodayISO();
           break;
-        case 'last_week':
+        case "last_week":
           const lastWeekEnd = new Date(today);
           lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
           const lastWeekStart = new Date(lastWeekEnd);
           lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-          start = lastWeekStart.toISOString().split('T')[0];
-          end = lastWeekEnd.toISOString().split('T')[0];
+          start = lastWeekStart.toISOString().split("T")[0];
+          end = lastWeekEnd.toISOString().split("T")[0];
           break;
-        case 'this_month':
-          start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        case "this_month":
+          start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
           end = getTodayISO();
           break;
-        case 'last_7_days':
+        case "last_7_days":
           start = getDaysAgoISO(7);
           end = getTodayISO();
           break;
-        case 'last_30_days':
+        case "last_30_days":
           start = getDaysAgoISO(30);
           end = getTodayISO();
           break;
@@ -370,24 +356,21 @@ export function registerDailyToolsWithSentry(server: McpServer, env: Env, props:
       const totalDuration = summary.reduce((sum, item) => sum + item.duration, 0);
       const sortedSummary = summary.sort((a, b) => b.duration - a.duration);
 
-      const formattedSummary = sortedSummary.map(item => ({
+      const formattedSummary = sortedSummary.map((item) => ({
         activity: item.activity,
-        group: item.group || 'Ungrouped',
+        group: item.group || "Ungrouped",
         duration: formatDuration(item.duration),
-        percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + '%' : '0%',
+        percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + "%" : "0%",
       }));
 
-      return createSuccessResponse(
-        `Quick summary for ${period.replace('_', ' ')} (${start} to ${end})`,
-        {
-          period: period.replace('_', ' '),
-          dateRange: { start, end },
-          totalTime: formatDuration(totalDuration),
-          activitiesCount: formattedSummary.length,
-          topActivities: formattedSummary.slice(0, 5),
-          allActivities: formattedSummary,
-        }
-      );
-    }
+      return createSuccessResponse(`Quick summary for ${period.replace("_", " ")} (${start} to ${end})`, {
+        period: period.replace("_", " "),
+        dateRange: { start, end },
+        totalTime: formatDuration(totalDuration),
+        activitiesCount: formattedSummary.length,
+        topActivities: formattedSummary.slice(0, 5),
+        allActivities: formattedSummary,
+      });
+    },
   );
 }

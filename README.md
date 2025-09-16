@@ -1,26 +1,126 @@
-# Cloudflare Remote PostgreSQL Database MCP Server + GitHub OAuth
+# Daily Time Tracking MCP Server
 
-This is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server that enables you to **chat with your PostgreSQL database**, deployable as a remote MCP server with GitHub OAuth through Cloudflare. This is production ready MCP.
+A Model Context Protocol (MCP) server that integrates with [Daily Time Tracking](https://dailytimetracking.com) to provide seamless time tracking functionality within Claude Desktop.
 
-## Key Features
+## Features
 
-- **🗄️ Database Integration with Lifespan**: Direct PostgreSQL database connection for all MCP tool calls
-- **🛠️ Modular, Single Purpose Tools**: Following best practices around MCP tools and their descriptions
-- **🔐 Role-Based Access**: GitHub username-based permissions for database write operations
-- **📊 Schema Discovery**: Automatic table and column information retrieval
-- **🛡️ SQL Injection Protection**: Built-in validation and sanitization
-- **📈 Monitoring**: Optional Sentry integration for production monitoring
-- **☁️ Cloud Native**: Powered by [Cloudflare Workers](https://developers.cloudflare.com/workers/) for global scale
+🕒 **Complete Time Tracking Integration**
+- Get user account information and sync status
+- Retrieve and manage activities with group support
+- Generate time summaries by date range
+- Access detailed daily timesheets
+- Create new activities (with proper permissions)
+- Quick summaries for common time periods
 
-## Modular Architecture
+🔐 **Secure Authentication**
+- GitHub OAuth 2.0 integration
+- Role-based access control
+- Secure API key management
 
-This MCP server uses a clean, modular architecture that makes it easy to extend and maintain:
+☁️ **Cloudflare Workers Powered**
+- Serverless deployment
+- Global edge distribution
+- Durable Objects for state management
+- Optional Sentry monitoring
 
-- **`src/tools/`** - Individual tool implementations in separate files
-- **`registerAllTools()`** - Centralized tool registration system 
-- **Extensible Design** - Add new tools by creating files in `tools/` and registering them
+## Quick Start
 
-This architecture allows you to easily add new database operations, external API integrations, or any other MCP tools while keeping the codebase organized and maintainable.
+### Prerequisites
+
+1. **Daily Time Tracking App**
+   - Install from [dailytimetracking.com](https://dailytimetracking.com)
+   - Enable Web API in Preferences → Integrations
+   - Copy your API key
+
+2. **GitHub OAuth App**
+   - Create at [github.com/settings/developers](https://github.com/settings/developers)
+   - Set callback URL to your deployed URL + `/callback`
+
+### Local Development
+
+1. **Clone and Install**
+   ```bash
+   git clone <this-repo>
+   cd daily-time-tracking-mcp
+   npm install
+   ```
+
+2. **Configure Environment**
+   ```bash
+   cp .dev.vars.example .dev.vars
+   # Edit .dev.vars with your actual keys
+   ```
+
+3. **Start Development Server**
+   ```bash
+   npm run dev
+   # Server runs on http://localhost:8792
+   ```
+
+4. **Configure Claude Desktop**
+
+   Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+   ```json
+   {
+     "mcpServers": {
+       "daily-time-tracking": {
+         "command": "npx",
+         "args": ["mcp-remote", "http://localhost:8792/mcp"],
+         "env": {}
+       }
+     }
+   }
+   ```
+
+   Restart Claude Desktop and start tracking time!
+
+### Production Deployment
+
+1. **Deploy to Cloudflare Workers**
+   ```bash
+   wrangler deploy
+   ```
+
+2. **Set Production Secrets**
+   ```bash
+   wrangler secret put GITHUB_CLIENT_ID
+   wrangler secret put GITHUB_CLIENT_SECRET
+   wrangler secret put COOKIE_ENCRYPTION_KEY
+   wrangler secret put DAILY_API_KEY
+   ```
+
+3. **Update Claude Desktop Config**
+   ```json
+   {
+     "mcpServers": {
+       "daily-time-tracking": {
+         "command": "npx",
+         "args": ["mcp-remote", "https://your-worker.workers.dev/mcp"],
+         "env": {}
+       }
+     }
+   }
+   ```
+
+## Available MCP Tools
+
+### For All Users
+- `getDailyUser` - Account information and sync status
+- `getDailyActivities` - List activities with filtering options
+- `getDailySummary` - Time summary by date range
+- `getDailyTimesheet` - Detailed daily breakdown
+- `getDailyQuickSummary` - Common time periods (today, week, month)
+
+### For Privileged Users
+- `createDailyActivities` - Create and manage activities
+
+## Usage Examples
+
+Ask Claude things like:
+- *"Show me my time tracking activities"*
+- *"What did I work on today?"*
+- *"Give me a summary for this week"*
+- *"Create a new activity called 'Project Planning'"*
 
 ## Transport Protocols
 
@@ -31,59 +131,16 @@ This MCP server supports both modern and legacy transport protocols:
 
 For new implementations, use the `/mcp` endpoint as it provides better performance and reliability.
 
-## How It Works
+## Architecture
 
-The MCP server provides three main tools for database interaction:
-
-1. **`listTables`** - Get database schema and table information (all authenticated users)
-2. **`queryDatabase`** - Execute read-only SQL queries (all authenticated users)  
-3. **`executeDatabase`** - Execute write operations like INSERT/UPDATE/DELETE (privileged users only)
-
-**Authentication Flow**: Users authenticate via GitHub OAuth → Server validates permissions → Tools become available based on user's GitHub username.
-
-**Security Model**: 
-- All authenticated GitHub users can read data
-- Only specific GitHub usernames can write/modify data
-- SQL injection protection and query validation built-in
-
-## Simple Example First
-
-Want to see a basic MCP server before diving into the full database implementation? Check out `src/simple-math.ts` - a minimal MCP server with a single `calculate` tool that performs basic math operations (add, subtract, multiply, divide). This example demonstrates the core MCP components: server setup, tool definition with Zod schemas, and dual transport support (`/mcp` and `/sse` endpoints). You can run it locally with `wrangler dev --config wrangler-simple.jsonc` and test at `http://localhost:8789/mcp`.
-
-## Prerequisites
-
-- Node.js installed on your machine
-- A Cloudflare account (free tier works)
-- A GitHub account for OAuth setup
-- A PostgreSQL database (local or hosted)
-
-## Getting Started
-
-### Step 1: Install Wrangler CLI
-
-Install Wrangler globally to manage your Cloudflare Workers:
-
-```bash
-npm install -g wrangler
-```
-
-### Step 2: Authenticate with Cloudflare
-
-Log in to your Cloudflare account:
-
-```bash
-wrangler login
-```
-
-This will open a browser window where you can authenticate with your Cloudflare account.
-
-### Step 3: Clone and Setup
-
-Clone the repo directly & install dependencies: `npm install`.
+- **Frontend**: Claude Desktop MCP integration
+- **Backend**: Cloudflare Workers with TypeScript
+- **Authentication**: GitHub OAuth 2.0
+- **Time Tracking**: Daily Time Tracking API
+- **Storage**: Durable Objects for user sessions
+- **Monitoring**: Optional Sentry integration
 
 ## Environment Variables Setup
-
-Before running the MCP server, you need to configure several environment variables for authentication and database access.
 
 ### Create Environment Variables File
 
@@ -99,8 +156,8 @@ Before running the MCP server, you need to configure several environment variabl
    GITHUB_CLIENT_SECRET=your_github_client_secret
    COOKIE_ENCRYPTION_KEY=your_random_encryption_key
 
-   # Database Connection
-   DATABASE_URL=postgresql://username:password@localhost:5432/database_name
+   # Daily Time Tracking API Key
+   DAILY_API_KEY=your_daily_api_key
 
    # Optional: Sentry monitoring
    SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
@@ -112,7 +169,7 @@ Before running the MCP server, you need to configure several environment variabl
 1. **Create a GitHub OAuth App** for local development:
    - Go to [GitHub Developer Settings](https://github.com/settings/developers)
    - Click "New OAuth App"
-   - **Application name**: `MCP Server (Local Development)`
+   - **Application name**: `Daily Time Tracking MCP (Local Development)`
    - **Homepage URL**: `http://localhost:8792`
    - **Authorization callback URL**: `http://localhost:8792/callback`
    - Click "Register application"
@@ -129,40 +186,7 @@ openssl rand -hex 32
 ```
 Copy the output and paste it as `COOKIE_ENCRYPTION_KEY` in `.dev.vars`.
 
-## Database Setup
-
-1. **Set up PostgreSQL** using a hosted service like:
-   - [Supabase](https://supabase.com/) (recommended for beginners)
-   - [Neon](https://neon.tech/)
-   - Or use local PostgreSQL/Supabase
-
-2. **Update the DATABASE_URL** in `.dev.vars` with your connection string:
-   ```
-   DATABASE_URL=postgresql://username:password@host:5432/database_name
-   ```
-
-#### Connection String Examples:
-- **Local**: `postgresql://myuser:mypass@localhost:5432/mydb`
-- **Supabase**: `postgresql://postgres:your-password@db.your-project.supabase.co:5432/postgres`
-
-### Database Schema Setup
-
-The MCP server works with any PostgreSQL database schema. It will automatically discover:
-- All tables in the `public` schema
-- Column names, types, and constraints
-- Primary keys and indexes
-
-**Testing the Connection**: Once you have your database set up, you can test it by asking the MCP server "What tables are available in the database?" and then querying those tables to explore your data.
-
-## Local Development & Testing
-
-**Run the server locally**:
-   ```bash
-   wrangler dev
-   ```
-   This makes the server available at `http://localhost:8792`
-
-### Testing with MCP Inspector
+## Testing with MCP Inspector
 
 Use the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to test your server:
 
@@ -179,18 +203,21 @@ Use the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to
    - Once connected, you'll see the available tools
 
 3. **Test the tools**:
-   - Use `listTables` to see your database structure
-   - Use `queryDatabase` to run SELECT queries
-   - Use `executeDatabase` (if you have write access) for INSERT/UPDATE/DELETE operations
+   - Use `getDailyUser` to see your account information
+   - Use `getDailyActivities` to list your time tracking activities
+   - Use `getDailySummary` to get time summaries for date ranges
+   - Use `getDailyTimesheet` for detailed daily breakdowns
 
 ## Production Deployment
 
-#### Set up a KV namespace
-- Create the KV namespace: 
-`wrangler kv namespace create "OAUTH_KV"`
-- Update the `wrangler.jsonc` file with the KV ID (replace <Add-KV-ID>)
+### Set up a KV namespace
+- Create the KV namespace:
+```bash
+wrangler kv namespace create "OAUTH_KV"
+```
+- Update the `wrangler.jsonc` file with the KV ID
 
-#### Deploy
+### Deploy
 Deploy the MCP server to make it available on your workers.dev domain
 
 ```bash
@@ -198,142 +225,72 @@ wrangler deploy
 ```
 
 ### Create environment variables in production
-Create a new [GitHub OAuth App](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app): 
-- For the Homepage URL, specify `https://mcp-github-oauth.<your-subdomain>.workers.dev`
-- For the Authorization callback URL, specify `https://mcp-github-oauth.<your-subdomain>.workers.dev/callback`
-- Note your Client ID and generate a Client secret. 
+Create a new [GitHub OAuth App](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app):
+- For the Homepage URL, specify `https://your-worker.workers.dev`
+- For the Authorization callback URL, specify `https://your-worker.workers.dev/callback`
+- Note your Client ID and generate a Client secret.
 - Set all required secrets via Wrangler:
 ```bash
 wrangler secret put GITHUB_CLIENT_ID
 wrangler secret put GITHUB_CLIENT_SECRET
 wrangler secret put COOKIE_ENCRYPTION_KEY  # use: openssl rand -hex 32
-wrangler secret put DATABASE_URL
-wrangler secret put SENTRY_DSN  # optional (more on Sentry setup below)
+wrangler secret put DAILY_API_KEY
+wrangler secret put SENTRY_DSN  # optional
 ```
 
-#### Test
+### Test
 
-Test the remote server using [Inspector](https://modelcontextprotocol.io/docs/tools/inspector): 
+Test the remote server using [Inspector](https://modelcontextprotocol.io/docs/tools/inspector):
 
-```
+```bash
 npx @modelcontextprotocol/inspector@latest
 ```
-Enter `https://mcp-github-oauth.<your-subdomain>.workers.dev/mcp` (preferred) or `https://mcp-github-oauth.<your-subdomain>.workers.dev/sse` (legacy) and hit connect. Once you go through the authentication flow, you'll see the Tools working: 
-
-<img width="640" alt="image" src="https://github.com/user-attachments/assets/7973f392-0a9d-4712-b679-6dd23f824287" />
-
-You now have a remote MCP server deployed! 
-
-## Database Tools & Access Control
-
-### Available Tools
-
-#### 1. `listTables` (All Users)
-**Purpose**: Discover database schema and structure  
-**Access**: All authenticated GitHub users  
-**Usage**: Always run this first to understand your database structure
-
-```
-Example output:
-- Tables: users, products, orders
-- Columns: id (integer), name (varchar), created_at (timestamp)
-- Constraints and relationships
-```
-
-#### 2. `queryDatabase` (All Users) 
-**Purpose**: Execute read-only SQL queries  
-**Access**: All authenticated GitHub users  
-**Restrictions**: Only SELECT statements and read operations allowed
-
-```sql
--- Examples of allowed queries:
-SELECT * FROM users WHERE created_at > '2024-01-01';
-SELECT COUNT(*) FROM products;
-SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id;
-```
-
-#### 3. `executeDatabase` (Privileged Users Only)
-**Purpose**: Execute write operations (INSERT, UPDATE, DELETE, DDL)  
-**Access**: Restricted to specific GitHub usernames  
-**Capabilities**: Full database write access including schema modifications
-
-```sql
--- Examples of allowed operations:
-INSERT INTO users (name, email) VALUES ('New User', 'user@example.com');
-UPDATE products SET price = 29.99 WHERE id = 1;
-DELETE FROM orders WHERE status = 'cancelled';
-CREATE TABLE new_table (id SERIAL PRIMARY KEY, data TEXT);
-```
-
-### Access Control Configuration
-
-Database write access is controlled by GitHub username in the `ALLOWED_USERNAMES` configuration:
-
-```typescript
-// Add GitHub usernames for database write access
-const ALLOWED_USERNAMES = new Set([
-  'yourusername',    // Replace with your GitHub username
-  'teammate1',       // Add team members who need write access
-  'database-admin'   // Add other trusted users
-]);
-```
-
-**To update access permissions**:
-1. Edit `src/index.ts` and `src/index_non_sentry.ts`
-2. Update the `ALLOWED_USERNAMES` set with GitHub usernames
-3. Redeploy the worker: `wrangler deploy`
-
-### Typical Workflow
-
-1. **🔍 Discover**: Use `listTables` to understand database structure
-2. **📊 Query**: Use `queryDatabase` to read and analyze data  
-3. **✏️ Modify**: Use `executeDatabase` (if you have write access) to make changes
-
-### Security Features
-
-- **SQL Injection Protection**: All queries are validated before execution
-- **Operation Type Detection**: Automatic detection of read vs write operations
-- **User Context Tracking**: All operations are logged with GitHub user information
-- **Connection Pooling**: Efficient database connection management
-- **Error Sanitization**: Database errors are cleaned before being returned to users
+Enter `https://your-worker.workers.dev/mcp` (preferred) or `https://your-worker.workers.dev/sse` (legacy) and hit connect. Once you go through the authentication flow, you'll see the Tools working.
 
 ### Access the remote MCP server from Claude Desktop
 
 Open Claude Desktop and navigate to Settings -> Developer -> Edit Config. This opens the configuration file that controls which MCP servers Claude can access.
 
-Replace the content with the following configuration. Once you restart Claude Desktop, a browser window will open showing your OAuth login page. Complete the authentication flow to grant Claude access to your MCP server. After you grant access, the tools will become available for you to use. 
+Replace the content with the following configuration. Once you restart Claude Desktop, a browser window will open showing your OAuth login page. Complete the authentication flow to grant Claude access to your MCP server. After you grant access, the tools will become available for you to use.
 
-```
+```json
 {
   "mcpServers": {
-    "math": {
+    "daily-time-tracking": {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://mcp-github-oauth.<your-subdomain>.workers.dev/mcp"
+        "https://your-worker.workers.dev/mcp"
       ]
     }
   }
 }
 ```
 
-Once the Tools (under 🔨) show up in the interface, you can ask Claude to interact with your database. Example commands:
+Once the Tools (under 🔨) show up in the interface, you can ask Claude to interact with your time tracking data. Example commands:
 
-- **"What tables are available in the database?"** → Uses `listTables` tool
-- **"Show me all users created in the last 30 days"** → Uses `queryDatabase` tool  
-- **"Add a new user named John with email john@example.com"** → Uses `executeDatabase` tool (if you have write access)
+- **"Show me my time tracking activities"** → Uses `getDailyActivities` tool
+- **"What did I work on today?"** → Uses `getDailyQuickSummary` tool
+- **"Give me a summary for this week"** → Uses `getDailySummary` tool
+- **"Create a new activity called 'Project Planning'"** → Uses `createDailyActivities` tool (if you have write access)
 
-### Using Claude and other MCP Clients
+## Access Control Configuration
 
-When using Claude to connect to your remote MCP server, you may see some error messages. This is because Claude Desktop doesn't yet support remote MCP servers, so it sometimes gets confused. To verify whether the MCP server is connected, hover over the 🔨 icon in the bottom right corner of Claude's interface. You should see your tools available there.
+Activity creation access is controlled by GitHub username in the `ALLOWED_USERNAMES` configuration:
 
-#### Using Cursor and other MCP Clients
+```typescript
+// Add GitHub usernames for activity creation access
+const ALLOWED_USERNAMES = new Set([
+  'yourusername',    // Replace with your GitHub username
+  'teammate1',       // Add team members who need write access
+  'admin-user'       // Add other trusted users
+]);
+```
 
-To connect Cursor with your MCP server, choose `Type`: "Command" and in the `Command` field, combine the command and args fields into one (e.g. `npx mcp-remote https://<your-worker-name>.<your-subdomain>.workers.dev/sse`).
-
-Note that while Cursor supports HTTP+SSE servers, it doesn't support authentication, so you still need to use `mcp-remote` (and to use a STDIO server, not an HTTP one).
-
-You can connect your MCP server to other MCP clients like Windsurf by opening the client's configuration file, adding the same JSON that was used for the Claude setup, and restarting the MCP client.
+**To update access permissions**:
+1. Edit `src/tools/daily-tools.ts` and `src/tools/daily-tools-sentry.ts`
+2. Update the `ALLOWED_USERNAMES` set with GitHub usernames
+3. Redeploy the worker: `wrangler deploy`
 
 ## Sentry Integration (Optional)
 
@@ -345,54 +302,43 @@ This project includes optional Sentry integration for comprehensive error tracki
 ### Setting Up Sentry
 
 1. **Create a Sentry Account**: Sign up at [sentry.io](https://sentry.io) if you don't have an account.
-
-2. **Create a New Project**: Create a new project in Sentry and select "Cloudflare Workers" as the platform (search in the top right).
-
+2. **Create a New Project**: Create a new project in Sentry and select "Cloudflare Workers" as the platform.
 3. **Get Your DSN**: Copy the DSN from your Sentry project settings.
 
-### Using Sentry in Production
+To deploy with Sentry monitoring, update your `wrangler.jsonc` to use the Sentry-enabled version:
+```json
+{
+  "main": "src/index_sentry.ts"
+}
+```
 
-To deploy with Sentry monitoring:
+## Development
 
-1. **Set the Sentry DSN secret**:
-   ```bash
-   wrangler secret put SENTRY_DSN
-   ```
-   Enter your Sentry DSN when prompted.
+### Project Structure
+```
+src/
+├── index.ts                    # Main MCP server
+├── index_sentry.ts            # Sentry-enabled version
+├── daily-api/                 # Daily Time Tracking API client
+│   ├── client.ts              # API client implementation
+│   └── types.ts               # TypeScript types
+├── tools/                     # MCP tool implementations
+│   ├── daily-tools.ts         # Standard tools
+│   ├── daily-tools-sentry.ts  # Sentry-instrumented tools
+│   └── register-tools.ts      # Tool registration
+└── auth/                      # GitHub OAuth handlers
+    └── github-handler.ts      # OAuth flow implementation
+```
 
-2. **Update your wrangler.toml** to use the Sentry-enabled version:
-   ```toml
-   main = "src/index_sentry.ts"
-   ```
+### Commands
+```bash
+npm run dev          # Start development server
+npm run type-check   # TypeScript validation
+wrangler deploy      # Deploy to Cloudflare
+wrangler types       # Generate Worker types
+```
 
-3. **Deploy with Sentry**:
-   ```bash
-   wrangler deploy
-   ```
-
-### Using Sentry in Development
-
-1. **Add Sentry DSN to your `.dev.vars` file**:
-   ```
-   SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
-   NODE_ENV=development
-   ```
-
-2. **Run with Sentry enabled**:
-   ```bash
-   wrangler dev
-   ```
-
-### Sentry Features Included
-
-- **Error Tracking**: Automatic capture of all errors with context
-- **Performance Monitoring**: Full request tracing with 100% sample rate
-- **User Context**: Automatically binds GitHub user information to events
-- **Tool Tracing**: Each MCP tool call is traced with parameters
-- **Custom Error Handling**: User-friendly error messages with Event IDs
-- **Context Enrichment**: Automatic tagging and context for better debugging
-
-## How does it work? 
+## How does it work?
 
 #### OAuth Provider
 The OAuth Provider library serves as a complete OAuth 2.1 server implementation for Cloudflare Workers. It handles the complexities of the OAuth flow, including token issuance, validation, and management. In this project, it plays the dual role of:
@@ -413,15 +359,26 @@ The MCP Remote library enables your server to expose tools that can be invoked b
 - Defines the protocol for communication between clients and your server
 - Provides a structured way to define tools
 - Handles serialization and deserialization of requests and responses
-- Maintains the Server-Sent Events (SSE) connection between clients and your server
+- Maintains the connection between clients and your server
 
-## Testing
+## Contributing
 
-This project includes comprehensive unit tests covering all major functionality:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if needed
+5. Submit a pull request
 
-```bash
-npm test        # Run all tests
-npm run test:ui # Run tests with UI
-```
+## License
 
-The test suite covers database security, tool registration, permission handling, and response formatting with proper mocking of external dependencies.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+- [Daily Time Tracking Documentation](https://dailytimetracking.com/support)
+- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
+- [MCP Specification](https://modelcontextprotocol.io/)
+
+---
+
+**Built with ❤️ for productivity enthusiasts who want seamless time tracking in Claude Desktop**

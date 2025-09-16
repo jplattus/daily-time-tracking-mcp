@@ -14,7 +14,7 @@ import { DailyTimeTrackingClient, formatDuration, isValidISODate, getTodayISO, g
 const ALLOWED_USERNAMES = new Set<string>([
   // Add GitHub usernames of users who should have access to create/modify activities
   // For example: 'yourusername', 'coworkerusername'
-  'coleam00'
+  "jplattus",
 ]);
 
 export function registerDailyTools(server: McpServer, env: Env, props: Props) {
@@ -39,28 +39,20 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const response = await client.getUser();
 
         if (!response.success) {
-          return createErrorResponse(
-            `Failed to retrieve user information: ${response.error}`,
-            { statusCode: response.statusCode }
-          );
+          return createErrorResponse(`Failed to retrieve user information: ${response.error}`, { statusCode: response.statusCode });
         }
 
         const user = response.data!;
-        return createSuccessResponse(
-          `User information retrieved successfully`,
-          {
-            dataRetention: `${user.dataRetention} days`,
-            lastSynced: user.lastSynced || "Never synchronized",
-            syncStatus: user.lastSynced ? "Active" : "No data synced yet",
-          }
-        );
+        return createSuccessResponse(`User information retrieved successfully`, {
+          dataRetention: `${user.dataRetention} days`,
+          lastSynced: user.lastSynced || "Never synchronized",
+          syncStatus: user.lastSynced ? "Active" : "No data synced yet",
+        });
       } catch (error) {
-        console.error('getDailyUser error:', error);
-        return createErrorResponse(
-          `Error retrieving user information: ${error instanceof Error ? error.message : String(error)}`
-        );
+        console.error("getDailyUser error:", error);
+        return createErrorResponse(`Error retrieving user information: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }
+    },
   );
 
   // Tool 2: Get Activities - Available to all authenticated users
@@ -74,46 +66,41 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const response = await client.getActivities({ includeArchivedActivities });
 
         if (!response.success) {
-          return createErrorResponse(
-            `Failed to retrieve activities: ${response.error}`,
-            { statusCode: response.statusCode }
-          );
+          return createErrorResponse(`Failed to retrieve activities: ${response.error}`, { statusCode: response.statusCode });
         }
 
         const activities = response.data!;
         const totalActivities = activities.length;
-        const archivedCount = activities.filter(a => a.archived).length;
+        const archivedCount = activities.filter((a) => a.archived).length;
         const activeCount = totalActivities - archivedCount;
 
         // Group activities by group for better display
-        const groupedActivities = activities.reduce((acc, activity) => {
-          const groupName = activity.group || 'Ungrouped';
-          if (!acc[groupName]) {
-            acc[groupName] = [];
-          }
-          acc[groupName].push(activity);
-          return acc;
-        }, {} as Record<string, typeof activities>);
+        const groupedActivities = activities.reduce(
+          (acc, activity) => {
+            const groupName = activity.group || "Ungrouped";
+            if (!acc[groupName]) {
+              acc[groupName] = [];
+            }
+            acc[groupName].push(activity);
+            return acc;
+          },
+          {} as Record<string, typeof activities>,
+        );
 
-        return createSuccessResponse(
-          `Retrieved ${totalActivities} activities (${activeCount} active, ${archivedCount} archived)`,
-          {
-            summary: {
-              total: totalActivities,
-              active: activeCount,
-              archived: archivedCount,
-              groups: Object.keys(groupedActivities).length,
-            },
-            activitiesByGroup: groupedActivities,
-          }
-        );
+        return createSuccessResponse(`Retrieved ${totalActivities} activities (${activeCount} active, ${archivedCount} archived)`, {
+          summary: {
+            total: totalActivities,
+            active: activeCount,
+            archived: archivedCount,
+            groups: Object.keys(groupedActivities).length,
+          },
+          activitiesByGroup: groupedActivities,
+        });
       } catch (error) {
-        console.error('getDailyActivities error:', error);
-        return createErrorResponse(
-          `Error retrieving activities: ${error instanceof Error ? error.message : String(error)}`
-        );
+        console.error("getDailyActivities error:", error);
+        return createErrorResponse(`Error retrieving activities: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }
+    },
   );
 
   // Tool 3: Get Summary - Available to all authenticated users
@@ -135,10 +122,7 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const response = await client.getSummary({ start, end, includeArchivedActivities });
 
         if (!response.success) {
-          return createErrorResponse(
-            `Failed to retrieve summary: ${response.error}`,
-            { statusCode: response.statusCode }
-          );
+          return createErrorResponse(`Failed to retrieve summary: ${response.error}`, { statusCode: response.statusCode });
         }
 
         const summary = response.data!;
@@ -148,30 +132,25 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const sortedSummary = summary.sort((a, b) => b.duration - a.duration);
 
         // Format with human-readable durations
-        const formattedSummary = sortedSummary.map(item => ({
+        const formattedSummary = sortedSummary.map((item) => ({
           activity: item.activity,
-          group: item.group || 'Ungrouped',
+          group: item.group || "Ungrouped",
           duration: formatDuration(item.duration),
           durationSeconds: item.duration,
-          percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + '%' : '0%',
+          percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + "%" : "0%",
         }));
 
-        return createSuccessResponse(
-          `Time summary from ${start} to ${end} (${formattedSummary.length} activities)`,
-          {
-            period: { start, end },
-            totalTime: formatDuration(totalDuration),
-            totalSeconds: totalDuration,
-            activities: formattedSummary,
-          }
-        );
+        return createSuccessResponse(`Time summary from ${start} to ${end} (${formattedSummary.length} activities)`, {
+          period: { start, end },
+          totalTime: formatDuration(totalDuration),
+          totalSeconds: totalDuration,
+          activities: formattedSummary,
+        });
       } catch (error) {
-        console.error('getDailySummary error:', error);
-        return createErrorResponse(
-          `Error retrieving summary: ${error instanceof Error ? error.message : String(error)}`
-        );
+        console.error("getDailySummary error:", error);
+        return createErrorResponse(`Error retrieving summary: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }
+    },
   );
 
   // Tool 4: Get Timesheet - Available to all authenticated users
@@ -193,25 +172,22 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const response = await client.getTimesheet({ start, end, includeArchivedActivities });
 
         if (!response.success) {
-          return createErrorResponse(
-            `Failed to retrieve timesheet: ${response.error}`,
-            { statusCode: response.statusCode }
-          );
+          return createErrorResponse(`Failed to retrieve timesheet: ${response.error}`, { statusCode: response.statusCode });
         }
 
         const timesheet = response.data!;
         let totalDays = timesheet.length;
-        let daysWithActivity = timesheet.filter(day => day.activities.length > 0).length;
+        let daysWithActivity = timesheet.filter((day) => day.activities.length > 0).length;
         let totalTimeAllDays = 0;
 
         // Format timesheet with human-readable durations
-        const formattedTimesheet = timesheet.map(day => {
+        const formattedTimesheet = timesheet.map((day) => {
           const dayTotal = day.activities.reduce((sum, activity) => sum + activity.duration, 0);
           totalTimeAllDays += dayTotal;
 
-          const formattedActivities = day.activities.map(activity => ({
+          const formattedActivities = day.activities.map((activity) => ({
             activity: activity.activity,
-            group: activity.group || 'Ungrouped',
+            group: activity.group || "Ungrouped",
             duration: formatDuration(activity.duration),
             durationSeconds: activity.duration,
           }));
@@ -225,28 +201,23 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
           };
         });
 
-        return createSuccessResponse(
-          `Timesheet from ${start} to ${end} (${totalDays} days, ${daysWithActivity} with activity)`,
-          {
-            period: { start, end },
-            summary: {
-              totalDays,
-              daysWithActivity,
-              daysWithoutActivity: totalDays - daysWithActivity,
-              totalTime: formatDuration(totalTimeAllDays),
-              totalSeconds: totalTimeAllDays,
-              averagePerDay: totalDays > 0 ? formatDuration(Math.round(totalTimeAllDays / totalDays)) : '0s',
-            },
-            timesheet: formattedTimesheet,
-          }
-        );
+        return createSuccessResponse(`Timesheet from ${start} to ${end} (${totalDays} days, ${daysWithActivity} with activity)`, {
+          period: { start, end },
+          summary: {
+            totalDays,
+            daysWithActivity,
+            daysWithoutActivity: totalDays - daysWithActivity,
+            totalTime: formatDuration(totalTimeAllDays),
+            totalSeconds: totalTimeAllDays,
+            averagePerDay: totalDays > 0 ? formatDuration(Math.round(totalTimeAllDays / totalDays)) : "0s",
+          },
+          timesheet: formattedTimesheet,
+        });
       } catch (error) {
-        console.error('getDailyTimesheet error:', error);
-        return createErrorResponse(
-          `Error retrieving timesheet: ${error instanceof Error ? error.message : String(error)}`
-        );
+        console.error("getDailyTimesheet error:", error);
+        return createErrorResponse(`Error retrieving timesheet: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }
+    },
   );
 
   // Tool 5: Create Activities - Only available to privileged users
@@ -261,31 +232,26 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
           const response = await client.createActivities(activities, { archiveExistingActivities });
 
           if (!response.success) {
-            return createErrorResponse(
-              `Failed to create activities: ${response.error}`,
-              { statusCode: response.statusCode }
-            );
+            return createErrorResponse(`Failed to create activities: ${response.error}`, { statusCode: response.statusCode });
           }
 
           const result = response.data!;
 
           return createSuccessResponse(
-            `Successfully processed ${activities.length} activities${archiveExistingActivities ? ' (existing activities were archived)' : ''}`,
+            `Successfully processed ${activities.length} activities${archiveExistingActivities ? " (existing activities were archived)" : ""}`,
             {
               requestedActivities: activities.length,
               processedActivities: result.length,
               archivedExisting: archiveExistingActivities || false,
               activities: result,
               executedBy: `${props.login} (${props.name})`,
-            }
+            },
           );
         } catch (error) {
-          console.error('createDailyActivities error:', error);
-          return createErrorResponse(
-            `Error creating activities: ${error instanceof Error ? error.message : String(error)}`
-          );
+          console.error("createDailyActivities error:", error);
+          return createErrorResponse(`Error creating activities: ${error instanceof Error ? error.message : String(error)}`);
         }
-      }
+      },
     );
   }
 
@@ -311,35 +277,35 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const today = new Date();
 
         switch (period) {
-          case 'today':
+          case "today":
             start = end = getTodayISO();
             break;
-          case 'yesterday':
+          case "yesterday":
             start = end = getDaysAgoISO(1);
             break;
-          case 'this_week':
+          case "this_week":
             const startOfWeek = new Date(today);
             startOfWeek.setDate(today.getDate() - today.getDay());
-            start = startOfWeek.toISOString().split('T')[0];
+            start = startOfWeek.toISOString().split("T")[0];
             end = getTodayISO();
             break;
-          case 'last_week':
+          case "last_week":
             const lastWeekEnd = new Date(today);
             lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
             const lastWeekStart = new Date(lastWeekEnd);
             lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-            start = lastWeekStart.toISOString().split('T')[0];
-            end = lastWeekEnd.toISOString().split('T')[0];
+            start = lastWeekStart.toISOString().split("T")[0];
+            end = lastWeekEnd.toISOString().split("T")[0];
             break;
-          case 'this_month':
-            start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+          case "this_month":
+            start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
             end = getTodayISO();
             break;
-          case 'last_7_days':
+          case "last_7_days":
             start = getDaysAgoISO(7);
             end = getTodayISO();
             break;
-          case 'last_30_days':
+          case "last_30_days":
             start = getDaysAgoISO(30);
             end = getTodayISO();
             break;
@@ -351,40 +317,32 @@ export function registerDailyTools(server: McpServer, env: Env, props: Props) {
         const response = await client.getSummary({ start, end, includeArchivedActivities });
 
         if (!response.success) {
-          return createErrorResponse(
-            `Failed to retrieve quick summary: ${response.error}`,
-            { statusCode: response.statusCode }
-          );
+          return createErrorResponse(`Failed to retrieve quick summary: ${response.error}`, { statusCode: response.statusCode });
         }
 
         const summary = response.data!;
         const totalDuration = summary.reduce((sum, item) => sum + item.duration, 0);
         const sortedSummary = summary.sort((a, b) => b.duration - a.duration);
 
-        const formattedSummary = sortedSummary.map(item => ({
+        const formattedSummary = sortedSummary.map((item) => ({
           activity: item.activity,
-          group: item.group || 'Ungrouped',
+          group: item.group || "Ungrouped",
           duration: formatDuration(item.duration),
-          percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + '%' : '0%',
+          percentage: totalDuration > 0 ? ((item.duration / totalDuration) * 100).toFixed(1) + "%" : "0%",
         }));
 
-        return createSuccessResponse(
-          `Quick summary for ${period.replace('_', ' ')} (${start} to ${end})`,
-          {
-            period: period.replace('_', ' '),
-            dateRange: { start, end },
-            totalTime: formatDuration(totalDuration),
-            activitiesCount: formattedSummary.length,
-            topActivities: formattedSummary.slice(0, 5), // Show top 5
-            allActivities: formattedSummary,
-          }
-        );
+        return createSuccessResponse(`Quick summary for ${period.replace("_", " ")} (${start} to ${end})`, {
+          period: period.replace("_", " "),
+          dateRange: { start, end },
+          totalTime: formatDuration(totalDuration),
+          activitiesCount: formattedSummary.length,
+          topActivities: formattedSummary.slice(0, 5), // Show top 5
+          allActivities: formattedSummary,
+        });
       } catch (error) {
-        console.error('getDailyQuickSummary error:', error);
-        return createErrorResponse(
-          `Error retrieving quick summary: ${error instanceof Error ? error.message : String(error)}`
-        );
+        console.error("getDailyQuickSummary error:", error);
+        return createErrorResponse(`Error retrieving quick summary: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }
+    },
   );
 }
